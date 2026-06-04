@@ -4,12 +4,11 @@ import requests
 from datetime import datetime
 
 # --- CREDENTIALS FROM GITHUB SECRETS ---
-# We only need your secret ntfy topic name now!
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
 
 # --- BOT HUNTING PARAMETERS ---
 TARGET_DATE = "2026-06-06"     # Must be YYYY-MM-DD format
-START_TIME = "10:00"           # Earliest acceptable time
+START_TIME = "06:00"           # Earliest acceptable time
 END_TIME = "14:30"             # Latest acceptable time
 DESIRED_PARTY_SIZE = 4         # Will filter out slots with fewer available openings!
 
@@ -96,18 +95,17 @@ if found_slots:
     unique_slots = list(set(found_slots))
     unique_slots.sort()
     
-    # We can use emojis and nice formatting again!
-    msg_body = f"Openings found for {DESIRED_PARTY_SIZE}:\n\n" + "\n".join(unique_slots)
+    # Body text is perfectly fine to have emojis
+    msg_body = f"⛳ Openings found for {DESIRED_PARTY_SIZE} players:\n\n" + "\n".join(unique_slots)
     
     try:
-        # Send the push notification directly to your phone app
         response = requests.post(
             f"https://ntfy.sh/{NTFY_TOPIC}",
             data=msg_body.encode('utf-8'),
             headers={
-                "Title": "⛳ SLC Tee Time Alert!",
+                "Title": "SLC Tee Time Alert!", # <-- The crashing emoji has been removed from the header!
                 "Priority": "high",
-                "Tags": "golf"
+                "Tags": "golf" # <-- This tag automatically adds the emoji back onto your phone screen!
             }
         )
         print(f"🚀 Success! Push notification sent to your phone.")
