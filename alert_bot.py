@@ -11,8 +11,8 @@ PHONE_GATEWAY = os.environ.get("PHONE_GATEWAY")
 
 # --- BOT HUNTING PARAMETERS ---
 TARGET_DATE = "2026-06-06"     # Must be YYYY-MM-DD format
-START_TIME = "06:00"           # Earliest acceptable time
-END_TIME = "10:00"             # Latest acceptable time
+START_TIME = "10:00"           # Earliest acceptable time
+END_TIME = "14:30"             # Latest acceptable time
 DESIRED_PARTY_SIZE = 4         # Will filter out slots with fewer available openings!
 
 # --- THE COMPLETE COURSE DICTIONARY ---
