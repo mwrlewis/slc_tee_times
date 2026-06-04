@@ -9,7 +9,7 @@ SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
 PHONE_GATEWAY = os.environ.get("PHONE_GATEWAY")
 
-# --- BOT HUNTING PARAMETERS (Edit these whenever you want!) ---
+# --- BOT HUNTING PARAMETERS ---
 TARGET_DATE = "2026-06-06"     # Must be YYYY-MM-DD format
 START_TIME = "06:00"           # Earliest acceptable time
 END_TIME = "10:00"             # Latest acceptable time
@@ -33,7 +33,6 @@ COURSES = {
 
 URL = "https://www.chronogolf.com/marketplace/v2/teetimes"
 
-# --- UPDATED "HUMAN DISGUISE" HEADERS ---
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept": "application/json, text/plain, */*",
@@ -61,16 +60,21 @@ for course_id, short_name in COURSES.items():
         try:
             response = scraper.get(URL, headers=HEADERS, params=PARAMS)
             
-            # --- THE DIAGNOSTICS TRAP ---
             if response.status_code != 200:
                 print(f"⚠️ BLOCKED by Cloudflare on {short_name}! Status Code: {response.status_code}")
                 break
                 
             data = response.json()
-            tee_time_list = data.get('data', []) if isinstance(data, dict) else []
+            
+            # --- THE FIX: Bulletproof parsing exactly like Streamlit ---
+            if isinstance(data, dict):
+                tee_time_list = data.get('data', data.get('teetimes', data.get('tee_times', [])))
+            elif isinstance(data, list):
+                tee_time_list = data
+            else:
+                tee_time_list = []
             
             if not tee_time_list:
-                # If it didn't get blocked but just found zero times on page 1, let us know
                 if page_num == 1:
                     print(f"✅ Clear connection to {short_name}, but zero times exist on this date.")
                 break
@@ -92,11 +96,9 @@ for course_id, short_name in COURSES.items():
 
 # --- SMS NOTIFICATION LOGIC ---
 if found_slots:
-    # Deduplicate and sort times to keep the message neat
     unique_slots = list(set(found_slots))
     unique_slots.sort()
     
-    # Construct a highly compacted message body to respect the 160 SMS character limit
     msg_body = f"⛳ Openings found for {DESIRED_PARTY_SIZE}:\n" + "\n".join(unique_slots)
     
     msg = EmailMessage()
@@ -111,6 +113,7 @@ if found_slots:
         server.send_message(msg)
         server.quit()
         print(f"🚀 Success! Alert sent containing {len(unique_slots)} options.")
+        print(msg_body) # Print the text body to the log so we can read it in GitHub!
     except Exception as e:
         print(f"❌ Failed to transmit message: {e}")
 else:
