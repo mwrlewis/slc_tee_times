@@ -1,13 +1,11 @@
 import os
-import smtplib
-from email.message import EmailMessage
 import cloudscraper
+import requests
 from datetime import datetime
 
-# --- CREDENTIALS FROM GITHUB SECRETS (Now automatically scrubbed of hidden spaces!) ---
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "").replace('\xa0', '').strip()
-EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "").replace('\xa0', '').strip()
-PHONE_GATEWAY = os.environ.get("PHONE_GATEWAY", "").replace('\xa0', '').strip()
+# --- CREDENTIALS FROM GITHUB SECRETS ---
+# We only need your secret ntfy topic name now!
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
 
 # --- BOT HUNTING PARAMETERS ---
 TARGET_DATE = "2026-06-06"     # Must be YYYY-MM-DD format
@@ -93,30 +91,28 @@ for course_id, short_name in COURSES.items():
             print(f"Crash on {short_name}: {e}")
             continue
 
-# --- SMS NOTIFICATION LOGIC ---
+# --- NTFY PUSH NOTIFICATION LOGIC ---
 if found_slots:
     unique_slots = list(set(found_slots))
     unique_slots.sort()
     
-    raw_msg = f"Alert! Openings found for {DESIRED_PARTY_SIZE}:\n" + "\n".join(unique_slots)
+    # We can use emojis and nice formatting again!
+    msg_body = f"Openings found for {DESIRED_PARTY_SIZE}:\n\n" + "\n".join(unique_slots)
     
-    # Force into pure ASCII to prevent gateway crashes
-    clean_msg = raw_msg.encode('ascii', 'ignore').decode('ascii')
-    
-    msg = EmailMessage()
-    msg.set_content(clean_msg)
-    msg['Subject'] = "Tee Time Alert"
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = PHONE_GATEWAY
-
     try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(SENDER_EMAIL, EMAIL_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"Success! Alert sent containing {len(unique_slots)} options.")
-        print(clean_msg) 
+        # Send the push notification directly to your phone app
+        response = requests.post(
+            f"https://ntfy.sh/{NTFY_TOPIC}",
+            data=msg_body.encode('utf-8'),
+            headers={
+                "Title": "⛳ SLC Tee Time Alert!",
+                "Priority": "high",
+                "Tags": "golf"
+            }
+        )
+        print(f"🚀 Success! Push notification sent to your phone.")
+        print(msg_body) 
     except Exception as e:
-        print(f"Failed to transmit message: {e}")
+        print(f"❌ Failed to transmit message: {e}")
 else:
-    print("Sweep complete. No valid openings match your filter criteria.")
+    print("🛑 Sweep complete. No valid openings match your filter criteria.")
