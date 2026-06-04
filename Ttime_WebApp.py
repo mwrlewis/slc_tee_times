@@ -24,26 +24,28 @@ END_TIME = end_time_input.strftime("%H:%M")
 # Convert the UI string ("4") into an actual mathematical integer (4)
 DESIRED_PARTY_SIZE = int(players_input)
 
-# --- THE COURSE LIST (All 12 restored) ---
+# --- THE COURSE LIST ---
 COURSE_UUIDS_LIST = [
     "bc27ab7a-6218-4b61-9aa8-0838f7c44ce3",  # Bonneville
     "caa8142a-4a42-482b-8d35-4239ce26f7b0",  # Bonneville Hole 10 
     "41ea25ca-ffcb-4f14-a86d-de0ef84510e0",  # Forest Dale
+    "997cd01f-4ce8-4462-a459-594762efb606",  # Nibley Park (Updated!)
     "2c162b65-6803-4bad-9a21-4c1ca88bb242",  # Valley Course 1
     "77dca1a2-edae-47d2-a202-a1e9391cc305",  # Valley Course 2
     "bd6e3c42-7ae5-4d97-b6d0-60ebf9957a7e",  # Valley Course 3
     "547936f8-0f45-4bea-b557-d15a4de485ad",  # Valley Course 4
     "4984e272-06a5-446a-8e24-8402e3591b7c",  # Valley Course 5
-    "997cd01f-4ce8-4462-a459-594762efb606",  # Valley Course 6
     "19a5558e-3821-4935-b6bd-0cbc99693d91",  # Valley Course 7
     "f899015b-2109-4028-8640-d670ada581e4",  # Valley Course 8
     "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db"   # Valley Course 9
 ]
 
+# --- DIRECT COURSE LINKS ---
 COURSE_LINKS = {
     "bc27ab7a-6218-4b61-9aa8-0838f7c44ce3": "https://www.chronogolf.com/club/bonneville-golf-course",
     "caa8142a-4a42-482b-8d35-4239ce26f7b0": "https://www.chronogolf.com/club/bonneville-golf-course",
     "41ea25ca-ffcb-4f14-a86d-de0ef84510e0": "https://www.chronogolf.com/club/forest-dale-golf-course",
+    "997cd01f-4ce8-4462-a459-594762efb606": "https://www.chronogolf.com/club/nibley-park-golf-course", # Added Nibley Link!
 }
 
 URL = "https://www.chronogolf.com/marketplace/v2/teetimes"
@@ -86,7 +88,6 @@ if st.button("🔍 Check For Openings", type="primary"):
                     
                     for item in tee_time_list:
                         
-                        # --- THE FOOLPROOF CAPACITY FILTER ---
                         # Read the secret max_player_size key. Default to 4 if it's missing.
                         max_allowed = item.get('max_player_size', 4)
                         
@@ -99,6 +100,8 @@ if st.button("🔍 Check For Openings", type="primary"):
                         
                         if course_id == "caa8142a-4a42-482b-8d35-4239ce26f7b0":
                             course_name = "Bonneville (Hole 10 Start)"
+                        elif course_id == "997cd01f-4ce8-4462-a459-594762efb606":
+                            course_name = "Nibley Park"
                             
                         if raw_time:
                             time_part = raw_time.zfill(5)
@@ -138,3 +141,4 @@ if st.button("🔍 Check For Openings", type="primary"):
                 
         else:
             st.warning(f"❌ No available times found between {START_TIME} and {END_TIME} with {players_input} open spots.")
+            
