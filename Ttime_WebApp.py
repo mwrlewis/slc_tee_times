@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import cloudscraper  # <-- NEW: The Cloudflare bypasser
 from datetime import datetime
 
 # --- WEB APP SETUP ---
@@ -18,8 +19,7 @@ TARGET_DATE = target_date.strftime("%Y-%m-%d")
 START_TIME = start_time_input.strftime("%H:%M")
 END_TIME = end_time_input.strftime("%H:%M")
 
-# --- THE COURSE LIST (Converted to a Python List) ---
-# By making this a real list (using square brackets), we can loop through them one by one.
+# --- THE COURSE LIST ---
 COURSE_UUIDS_LIST = [
     "bc27ab7a-6218-4b61-9aa8-0838f7c44ce3",  # Bonneville
     "caa8142a-4a42-482b-8d35-4239ce26f7b0",  # Glendale
@@ -35,7 +35,6 @@ COURSE_UUIDS_LIST = [
     "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db"   # Valley Course 9
 ]
 
-# --- API DETAILS & SECURITY HEADERS ---
 URL = "https://www.chronogolf.com/marketplace/v2/teetimes"
 
 HEADERS = {
@@ -43,37 +42,40 @@ HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
     "Origin": "https://www.chronogolf.com",
-    "Referer": "https://www.chronogolf.com/marketplace",
-    "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-    "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": '"macOS"'
+    "Referer": "https://www.chronogolf.com/marketplace"
 }
 
 # --- THE SEARCH BUTTON LOGIC ---
 if st.button("🔍 Check For Openings", type="primary"):
-    
-    # We update the spinner text so you know it's working hard!
-    with st.spinner("Querying courses one by one to ensure no data is lost..."):
+    with st.spinner("Bypassing server security and querying courses..."):
+        
+        # NEW: Initialize the scraper with a forged Chrome profile
+        scraper = cloudscraper.create_scraper(browser={
+            'browser': 'chrome',
+            'platform': 'darwin',
+            'desktop': True
+        })
+        
         course_openings = {}
         openings_found = 0
         
-        # 1. Loop through each course individually
         for course_id in COURSE_UUIDS_LIST:
-            
-            # 2. Check up to 2 pages per individual course (plenty for just one location)
             for page_num in range(1, 3):
                 PARAMS = {
                     "start_date": TARGET_DATE, 
-                    "course_ids": course_id,  # We only send ONE id at a time now
+                    "course_ids": course_id,
                     "holes": "9,18", 
                     "page": str(page_num) 
                 }
                 
                 try:
-                    response = requests.get(URL, headers=HEADERS, params=PARAMS)
+                    # NEW: We use scraper.get() instead of requests.get()
+                    response = scraper.get(URL, headers=HEADERS, params=PARAMS)
                     
                     if response.status_code != 200:
-                        break # Skip to the next page/course if this one fails
+                        # Let's show a temporary warning so you know if it's still being blocked!
+                        st.warning(f"Course blocked by firewall (Error {response.status_code})")
+                        break 
                     
                     data = response.json()
                     
@@ -85,7 +87,7 @@ if st.button("🔍 Check For Openings", type="primary"):
                         tee_time_list = []
                         
                     if not tee_time_list:
-                        break # No more times for this specific course, move to the next course!
+                        break 
                     
                     for item in tee_time_list:
                         raw_time = item.get('start_time') 
@@ -103,7 +105,6 @@ if st.button("🔍 Check For Openings", type="primary"):
                                     openings_found += 1
                                     
                 except Exception as e:
-                    # If one course errors out, we don't want the whole app to crash
                     continue 
 
         # --- DISPLAY RESULTS ---
