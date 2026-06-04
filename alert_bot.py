@@ -61,12 +61,11 @@ for course_id, short_name in COURSES.items():
             response = scraper.get(URL, headers=HEADERS, params=PARAMS)
             
             if response.status_code != 200:
-                print(f"⚠️ BLOCKED by Cloudflare on {short_name}! Status Code: {response.status_code}")
+                print(f"BLOCKED by Cloudflare on {short_name}! Status Code: {response.status_code}")
                 break
                 
             data = response.json()
             
-            # --- Bulletproof parsing exactly like Streamlit ---
             if isinstance(data, dict):
                 tee_time_list = data.get('data', data.get('teetimes', data.get('tee_times', [])))
             elif isinstance(data, list):
@@ -76,7 +75,7 @@ for course_id, short_name in COURSES.items():
             
             if not tee_time_list:
                 if page_num == 1:
-                    print(f"✅ Clear connection to {short_name}, but zero times exist on this date.")
+                    print(f"Clear connection to {short_name}, but zero times exist on this date.")
                 break
                 
             for item in tee_time_list:
@@ -91,7 +90,7 @@ for course_id, short_name in COURSES.items():
                         found_slots.append(f"{short_name} {time_part}")
                         
         except Exception as e:
-            print(f"❌ Crash on {short_name}: {e}")
+            print(f"Crash on {short_name}: {e}")
             continue
 
 # --- SMS NOTIFICATION LOGIC ---
@@ -99,14 +98,17 @@ if found_slots:
     unique_slots = list(set(found_slots))
     unique_slots.sort()
     
-    msg_body = f"⛳ Openings found for {DESIRED_PARTY_SIZE}:\n" + "\n".join(unique_slots)
+    # Removed emojis completely to appease the cell carrier gods
+    raw_msg = f"Alert! Openings found for {DESIRED_PARTY_SIZE}:\n" + "\n".join(unique_slots)
     
-    # --- SCRUB THE HIDDEN CHARACTERS ---
-    msg_body = msg_body.replace('\xa0', ' ')
+    # --- THE NUKE OPTION ---
+    # This forces the text into pure ASCII. It will delete emojis, hidden API spaces, 
+    # or anything else that crashes SMS gateways.
+    clean_msg = raw_msg.encode('ascii', 'ignore').decode('ascii')
     
     msg = EmailMessage()
-    msg.set_content(msg_body)
-    msg['Subject'] = "⛳ Alert"
+    msg.set_content(clean_msg)
+    msg['Subject'] = "Tee Time Alert"
     msg['From'] = SENDER_EMAIL
     msg['To'] = PHONE_GATEWAY
 
@@ -115,9 +117,9 @@ if found_slots:
         server.login(SENDER_EMAIL, EMAIL_PASSWORD)
         server.send_message(msg)
         server.quit()
-        print(f"🚀 Success! Alert sent containing {len(unique_slots)} options.")
-        print(msg_body) 
+        print(f"Success! Alert sent containing {len(unique_slots)} options.")
+        print(clean_msg) 
     except Exception as e:
-        print(f"❌ Failed to transmit message: {e}")
+        print(f"Failed to transmit message: {e}")
 else:
-    print("🛑 Sweep complete. No valid openings match your filter criteria.")
+    print("Sweep complete. No valid openings match your filter criteria.")
