@@ -9,11 +9,15 @@ st.title("⛳ SLC Tee Time Finder")
 
 # --- INTERACTIVE UI CONTROLS ---
 target_date = st.date_input("Select a Date")
-col1, col2 = st.columns(2)
+
+# We updated this to 3 columns to fit the new player dropdown!
+col1, col2, col3 = st.columns(3)
 with col1:
     start_time_input = st.time_input("Earliest Time", value=datetime.strptime("06:00", "%H:%M"))
 with col2:
     end_time_input = st.time_input("Latest Time", value=datetime.strptime("18:00", "%H:%M"))
+with col3:
+    players_input = st.selectbox("Players", ["1", "2", "3", "4"], index=3) # Defaults to 4
 
 TARGET_DATE = target_date.strftime("%Y-%m-%d")
 START_TIME = start_time_input.strftime("%H:%M")
@@ -22,7 +26,7 @@ END_TIME = end_time_input.strftime("%H:%M")
 # --- THE COURSE LIST ---
 COURSE_UUIDS_LIST = [
     "bc27ab7a-6218-4b61-9aa8-0838f7c44ce3",  # Bonneville
-    "caa8142a-4a42-482b-8d35-4239ce26f7b0",  # Glendale
+    "caa8142a-4a42-482b-8d35-4239ce26f7b0",  # Bonneville Hole 10 
     "41ea25ca-ffcb-4f14-a86d-de0ef84510e0",  # Forest Dale
     "2c162b65-6803-4bad-9a21-4c1ca88bb242",  # Valley Course 1
     "77dca1a2-edae-47d2-a202-a1e9391cc305",  # Valley Course 2
@@ -34,6 +38,13 @@ COURSE_UUIDS_LIST = [
     "f899015b-2109-4028-8640-d670ada581e4",  # Valley Course 8
     "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db"   # Valley Course 9
 ]
+
+# --- DIRECT COURSE LINKS ---
+COURSE_LINKS = {
+    "bc27ab7a-6218-4b61-9aa8-0838f7c44ce3": "https://www.chronogolf.com/club/bonneville-golf-course",
+    "caa8142a-4a42-482b-8d35-4239ce26f7b0": "https://www.chronogolf.com/club/bonneville-golf-course",
+    "41ea25ca-ffcb-4f14-a86d-de0ef84510e0": "https://www.chronogolf.com/club/forest-dale-golf-course",
+}
 
 URL = "https://www.chronogolf.com/marketplace/v2/teetimes"
 
@@ -47,7 +58,7 @@ HEADERS = {
 
 # --- THE SEARCH BUTTON LOGIC ---
 if st.button("🔍 Check For Openings", type="primary"):
-    with st.spinner("Bypassing server security and querying courses..."):
+    with st.spinner(f"Hunting for {players_input}-player tee times..."):
         
         scraper = cloudscraper.create_scraper(browser={
             'browser': 'chrome',
@@ -64,6 +75,7 @@ if st.button("🔍 Check For Openings", type="primary"):
                     "start_date": TARGET_DATE, 
                     "course_ids": course_id,
                     "holes": "9,18", 
+                    "size": players_input,  # <--- Added the new parameter here!
                     "page": str(page_num) 
                 }
                 
@@ -71,7 +83,6 @@ if st.button("🔍 Check For Openings", type="primary"):
                     response = scraper.get(URL, headers=HEADERS, params=PARAMS)
                     
                     if response.status_code != 200:
-                        st.warning(f"Course blocked by firewall (Error {response.status_code})")
                         break 
                     
                     data = response.json()
@@ -90,15 +101,18 @@ if st.button("🔍 Check For Openings", type="primary"):
                         raw_time = item.get('start_time') 
                         course_name = item.get('course', {}).get('name', 'Unknown Course')
                         
+                        if course_id == "caa8142a-4a42-482b-8d35-4239ce26f7b0":
+                            course_name = "Bonneville (Hole 10 Start)"
+                            
                         if raw_time:
                             time_part = raw_time.zfill(5)
                             
                             if START_TIME <= time_part <= END_TIME:
                                 if course_name not in course_openings:
-                                    course_openings[course_name] = []
+                                    course_openings[course_name] = {"times": [], "uuid": course_id}
                                 
-                                if time_part not in course_openings[course_name]:
-                                    course_openings[course_name].append(time_part)
+                                if time_part not in course_openings[course_name]["times"]:
+                                    course_openings[course_name]["times"].append(time_part)
                                     openings_found += 1
                                     
                 except Exception as e:
@@ -108,17 +122,22 @@ if st.button("🔍 Check For Openings", type="primary"):
         if openings_found > 0:
             st.success(f"🎉 Found {openings_found} total tee times matching your filters!")
             
-            for course_name, times in course_openings.items():
+            for course_name, data in course_openings.items():
+                times = data["times"]
+                course_uuid = data["uuid"]
+                
                 times.sort() 
                 st.subheader(f"⛳ {course_name}")
                 formatted_times = ", ".join(times)
                 st.info(f"**Available Slots:** {formatted_times}")
                 
-                # NEW: Add a clickable booking button under each course's results!
-                booking_url = f"https://www.chronogolf.com/marketplace?date={TARGET_DATE}"
-                st.link_button(f"🔗 Go to Chronogolf Booking Page", booking_url)
-                
-                # Add a subtle visual divider between courses so the buttons look neat
+                if course_uuid in COURSE_LINKS:
+                    base_url = COURSE_LINKS[course_uuid]
+                    booking_url = f"{base_url}?date={TARGET_DATE}"
+                else:
+                    booking_url = f"https://www.chronogolf.com/marketplace?date={TARGET_DATE}"
+                    
+                st.link_button(f"🔗 Book {course_name}", booking_url)
                 st.divider()
                 
         else:
