@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-import cloudscraper  # <-- NEW: The Cloudflare bypasser
+import cloudscraper 
 from datetime import datetime
 
 # --- WEB APP SETUP ---
@@ -49,7 +49,6 @@ HEADERS = {
 if st.button("🔍 Check For Openings", type="primary"):
     with st.spinner("Bypassing server security and querying courses..."):
         
-        # NEW: Initialize the scraper with a forged Chrome profile
         scraper = cloudscraper.create_scraper(browser={
             'browser': 'chrome',
             'platform': 'darwin',
@@ -69,11 +68,9 @@ if st.button("🔍 Check For Openings", type="primary"):
                 }
                 
                 try:
-                    # NEW: We use scraper.get() instead of requests.get()
                     response = scraper.get(URL, headers=HEADERS, params=PARAMS)
                     
                     if response.status_code != 200:
-                        # Let's show a temporary warning so you know if it's still being blocked!
                         st.warning(f"Course blocked by firewall (Error {response.status_code})")
                         break 
                     
@@ -116,6 +113,13 @@ if st.button("🔍 Check For Openings", type="primary"):
                 st.subheader(f"⛳ {course_name}")
                 formatted_times = ", ".join(times)
                 st.info(f"**Available Slots:** {formatted_times}")
+                
+                # NEW: Add a clickable booking button under each course's results!
+                booking_url = f"https://www.chronogolf.com/marketplace?date={TARGET_DATE}"
+                st.link_button(f"🔗 Go to Chronogolf Booking Page", booking_url)
+                
+                # Add a subtle visual divider between courses so the buttons look neat
+                st.divider()
                 
         else:
             st.warning(f"❌ No available times found between {START_TIME} and {END_TIME}.")
