@@ -1,28 +1,26 @@
 name: Tee Time Sniper Bot
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'  # This is server-code for "Every 5 Minutes"
-  workflow_dispatch:       # This lets you click a "Run" button manually to test it
+    - cron: '*/5 * * * *'
 
 jobs:
   hunt:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
-
-      - name: Set up Python
+        
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
-      - name: Install requirements
-        run: pip install -r requirements.txt
-
+          
+      - name: Install Dependencies
+        run: pip install cloudscraper requests
+        
       - name: Run the Bot
         env:
-          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          PHONE_GATEWAY: ${{ secrets.PHONE_GATEWAY }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python alert_bot.py
