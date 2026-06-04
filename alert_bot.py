@@ -66,7 +66,7 @@ for course_id, short_name in COURSES.items():
                 
             data = response.json()
             
-            # --- THE FIX: Bulletproof parsing exactly like Streamlit ---
+            # --- Bulletproof parsing exactly like Streamlit ---
             if isinstance(data, dict):
                 tee_time_list = data.get('data', data.get('teetimes', data.get('tee_times', [])))
             elif isinstance(data, list):
@@ -80,41 +80,4 @@ for course_id, short_name in COURSES.items():
                 break
                 
             for item in tee_time_list:
-                max_allowed = item.get('max_player_size', 4)
-                if DESIRED_PARTY_SIZE > max_allowed:
-                    continue
-                    
-                raw_time = item.get('start_time')
-                if raw_time:
-                    time_part = raw_time.zfill(5)
-                    if START_TIME <= time_part <= END_TIME:
-                        found_slots.append(f"{short_name} {time_part}")
-                        
-        except Exception as e:
-            print(f"❌ Crash on {short_name}: {e}")
-            continue
-
-# --- SMS NOTIFICATION LOGIC ---
-if found_slots:
-    unique_slots = list(set(found_slots))
-    unique_slots.sort()
-    
-    msg_body = f"⛳ Openings found for {DESIRED_PARTY_SIZE}:\n" + "\n".join(unique_slots)
-    
-    msg = EmailMessage()
-    msg.set_content(msg_body)
-    msg['Subject'] = "⛳ Alert"
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = PHONE_GATEWAY
-
-    try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(SENDER_EMAIL, EMAIL_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"🚀 Success! Alert sent containing {len(unique_slots)} options.")
-        print(msg_body) # Print the text body to the log so we can read it in GitHub!
-    except Exception as e:
-        print(f"❌ Failed to transmit message: {e}")
-else:
-    print("🛑 Sweep complete. No valid openings match your filter criteria.")
+                max_allowed
