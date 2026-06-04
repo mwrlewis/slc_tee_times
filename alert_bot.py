@@ -4,10 +4,10 @@ from email.message import EmailMessage
 import cloudscraper
 from datetime import datetime
 
-# --- CREDENTIALS FROM GITHUB SECRETS ---
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
-EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
-PHONE_GATEWAY = os.environ.get("PHONE_GATEWAY")
+# --- CREDENTIALS FROM GITHUB SECRETS (Now automatically scrubbed of hidden spaces!) ---
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "").replace('\xa0', '').strip()
+EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "").replace('\xa0', '').strip()
+PHONE_GATEWAY = os.environ.get("PHONE_GATEWAY", "").replace('\xa0', '').strip()
 
 # --- BOT HUNTING PARAMETERS ---
 TARGET_DATE = "2026-06-06"     # Must be YYYY-MM-DD format
@@ -98,12 +98,9 @@ if found_slots:
     unique_slots = list(set(found_slots))
     unique_slots.sort()
     
-    # Removed emojis completely to appease the cell carrier gods
     raw_msg = f"Alert! Openings found for {DESIRED_PARTY_SIZE}:\n" + "\n".join(unique_slots)
     
-    # --- THE NUKE OPTION ---
-    # This forces the text into pure ASCII. It will delete emojis, hidden API spaces, 
-    # or anything else that crashes SMS gateways.
+    # Force into pure ASCII to prevent gateway crashes
     clean_msg = raw_msg.encode('ascii', 'ignore').decode('ascii')
     
     msg = EmailMessage()
