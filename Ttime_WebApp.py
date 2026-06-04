@@ -9,15 +9,13 @@ st.title("⛳ SLC Tee Time Finder")
 
 # --- INTERACTIVE UI CONTROLS ---
 target_date = st.date_input("Select a Date")
-
-# We updated this to 3 columns to fit the new player dropdown!
 col1, col2, col3 = st.columns(3)
 with col1:
     start_time_input = st.time_input("Earliest Time", value=datetime.strptime("06:00", "%H:%M"))
 with col2:
     end_time_input = st.time_input("Latest Time", value=datetime.strptime("18:00", "%H:%M"))
 with col3:
-    players_input = st.selectbox("Players", ["1", "2", "3", "4"], index=3) # Defaults to 4
+    players_input = st.selectbox("Players", ["1", "2", "3", "4"], index=3) 
 
 TARGET_DATE = target_date.strftime("%Y-%m-%d")
 START_TIME = start_time_input.strftime("%H:%M")
@@ -75,7 +73,7 @@ if st.button("🔍 Check For Openings", type="primary"):
                     "start_date": TARGET_DATE, 
                     "course_ids": course_id,
                     "holes": "9,18", 
-                    "size": players_input,  # <--- Added the new parameter here!
+                    "nb_players": players_input,  # <-- FIX 1: Updated to the correct Chronogolf term
                     "page": str(page_num) 
                 }
                 
@@ -98,6 +96,12 @@ if st.button("🔍 Check For Openings", type="primary"):
                         break 
                     
                     for item in tee_time_list:
+                        
+                        # <-- FIX 2: The Python Safety Net!
+                        # If the server flags this specific slot as too small for your group, skip it entirely.
+                        if item.get('out_of_capacity') is True:
+                            continue
+                            
                         raw_time = item.get('start_time') 
                         course_name = item.get('course', {}).get('name', 'Unknown Course')
                         
@@ -133,9 +137,9 @@ if st.button("🔍 Check For Openings", type="primary"):
                 
                 if course_uuid in COURSE_LINKS:
                     base_url = COURSE_LINKS[course_uuid]
-                    booking_url = f"{base_url}?date={TARGET_DATE}"
+                    booking_url = f"{base_url}?date={TARGET_DATE}&nb_players={players_input}" # Appended players to the link too!
                 else:
-                    booking_url = f"https://www.chronogolf.com/marketplace?date={TARGET_DATE}"
+                    booking_url = f"https://www.chronogolf.com/marketplace?date={TARGET_DATE}&nb_players={players_input}"
                     
                 st.link_button(f"🔗 Book {course_name}", booking_url)
                 st.divider()
