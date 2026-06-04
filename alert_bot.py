@@ -11,12 +11,11 @@ PHONE_GATEWAY = os.environ.get("PHONE_GATEWAY")
 
 # --- BOT HUNTING PARAMETERS (Edit these whenever you want!) ---
 TARGET_DATE = "2026-06-06"     # Must be YYYY-MM-DD format
-START_TIME = "10:00"           # Earliest acceptable time
-END_TIME = "14:30"             # Latest acceptable time
+START_TIME = "06:00"           # Earliest acceptable time
+END_TIME = "10:00"             # Latest acceptable time
 DESIRED_PARTY_SIZE = 4         # Will filter out slots with fewer available openings!
 
 # --- THE COMPLETE COURSE DICTIONARY ---
-# Using a dictionary here lets the bot know exactly how to write short names for text alerts
 COURSES = {
     "bc27ab7a-6218-4b61-9aa8-0838f7c44ce3": "Bonneville",
     "caa8142a-4a42-482b-8d35-4239ce26f7b0": "Bonn. B9",
@@ -33,14 +32,21 @@ COURSES = {
 }
 
 URL = "https://www.chronogolf.com/marketplace/v2/teetimes"
+
+# --- UPDATED "HUMAN DISGUISE" HEADERS ---
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "application/json, text/plain, */*"
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin": "https://www.chronogolf.com",
+    "Referer": "https://www.chronogolf.com/marketplace"
 }
 
 # --- START THE SWEEP ---
 scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'darwin', 'desktop': True})
 found_slots = []
+
+print(f"Starting sweep for {TARGET_DATE} between {START_TIME} and {END_TIME} for {DESIRED_PARTY_SIZE} players...")
 
 for course_id, short_name in COURSES.items():
     for page_num in range(1, 3):
@@ -54,17 +60,22 @@ for course_id, short_name in COURSES.items():
         
         try:
             response = scraper.get(URL, headers=HEADERS, params=PARAMS)
+            
+            # --- THE DIAGNOSTICS TRAP ---
             if response.status_code != 200:
+                print(f"⚠️ BLOCKED by Cloudflare on {short_name}! Status Code: {response.status_code}")
                 break
                 
             data = response.json()
             tee_time_list = data.get('data', []) if isinstance(data, dict) else []
             
             if not tee_time_list:
+                # If it didn't get blocked but just found zero times on page 1, let us know
+                if page_num == 1:
+                    print(f"✅ Clear connection to {short_name}, but zero times exist on this date.")
                 break
                 
             for item in tee_time_list:
-                # Capacity Check matching our verified Streamlit fix
                 max_allowed = item.get('max_player_size', 4)
                 if DESIRED_PARTY_SIZE > max_allowed:
                     continue
@@ -72,11 +83,11 @@ for course_id, short_name in COURSES.items():
                 raw_time = item.get('start_time')
                 if raw_time:
                     time_part = raw_time.zfill(5)
-                    # Filter for our specific morning window
                     if START_TIME <= time_part <= END_TIME:
                         found_slots.append(f"{short_name} {time_part}")
                         
-        except Exception:
+        except Exception as e:
+            print(f"❌ Crash on {short_name}: {e}")
             continue
 
 # --- SMS NOTIFICATION LOGIC ---
@@ -99,8 +110,8 @@ if found_slots:
         server.login(SENDER_EMAIL, EMAIL_PASSWORD)
         server.send_message(msg)
         server.quit()
-        print(f"Success! Alert sent containing {len(unique_slots)} options.")
+        print(f"🚀 Success! Alert sent containing {len(unique_slots)} options.")
     except Exception as e:
-        print(f"Failed to transmit message: {e}")
+        print(f"❌ Failed to transmit message: {e}")
 else:
-    print("Sweep complete. No valid openings match your filter criteria.")
+    print("🛑 Sweep complete. No valid openings match your filter criteria.")
