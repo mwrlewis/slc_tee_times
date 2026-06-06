@@ -25,7 +25,8 @@ COURSES = {
     "4984e272-06a5-446a-8e24-8402e3591b7c": "Glendale B9",
     "19a5558e-3821-4935-b6bd-0cbc99693d91": "RosePark",
     "f899015b-2109-4028-8640-d670ada581e4": "RosePark B9",
-    "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db": "Meadowbrk"
+    "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db": "Meadowbrk",
+    "99cc98d7-03aa-400c-a8b6-c5e5f3665ca4": "OldMill"
 }
 
 URL = "https://www.chronogolf.com/marketplace/v2/teetimes"
@@ -45,39 +46,33 @@ found_slots = []
 print(f"Starting sweep for {TARGET_DATE} between {START_TIME} and {END_TIME} for {DESIRED_PARTY_SIZE} players...")
 
 for course_id, short_name in COURSES.items():
-    for page_num in range(1, 3):
+    
+    # ---------------------------------------------------------
+    # OLD MILL CODE SWITCH (PRIVATE CLUB API)
+    # ---------------------------------------------------------
+    if course_id == "99cc98d7-03aa-400c-a8b6-c5e5f3665ca4":
+        PRIVATE_URL = "https://www.chronogolf.com/marketplace/clubs/14210/teetimes"
+        affiliations = ["57662"] * DESIRED_PARTY_SIZE
+        
         PARAMS = {
-            "start_date": TARGET_DATE,
-            "course_ids": course_id,
-            "holes": "9,18",
-            "nb_players": str(DESIRED_PARTY_SIZE),
-            "page": str(page_num)
+            "date": TARGET_DATE,
+            "course_id": "16298",
+            "nb_holes": "18",
+            "affiliation_type_ids[]": affiliations
         }
         
         try:
-            response = scraper.get(URL, headers=HEADERS, params=PARAMS)
-            
+            response = scraper.get(PRIVATE_URL, headers=HEADERS, params=PARAMS)
             if response.status_code != 200:
                 print(f"BLOCKED by Cloudflare on {short_name}! Status Code: {response.status_code}")
-                break
+                continue
                 
-            data = response.json()
-            
-            if isinstance(data, dict):
-                tee_time_list = data.get('data', data.get('teetimes', data.get('tee_times', [])))
-            elif isinstance(data, list):
-                tee_time_list = data
-            else:
-                tee_time_list = []
-            
-            if not tee_time_list:
-                if page_num == 1:
-                    print(f"Clear connection to {short_name}, but zero times exist on this date.")
-                break
+            tee_time_list = response.json()
+            if isinstance(tee_time_list, dict):
+                tee_time_list = tee_time_list.get('data', tee_time_list.get('teetimes', []))
                 
             for item in tee_time_list:
-                max_allowed = item.get('max_player_size', 4)
-                if DESIRED_PARTY_SIZE > max_allowed:
+                if item.get('out_of_capacity') == True:
                     continue
                     
                 raw_time = item.get('start_time')
@@ -90,12 +85,60 @@ for course_id, short_name in COURSES.items():
             print(f"Crash on {short_name}: {e}")
             continue
 
+    # ---------------------------------------------------------
+    # ALL OTHER CITY COURSES (GLOBAL MARKETPLACE API)
+    # ---------------------------------------------------------
+    else:
+        for page_num in range(1, 3):
+            PARAMS = {
+                "start_date": TARGET_DATE,
+                "course_ids": course_id,
+                "holes": "9,18",
+                "page": str(page_num)
+            }
+            
+            try:
+                response = scraper.get(URL, headers=HEADERS, params=PARAMS)
+                
+                if response.status_code != 200:
+                    print(f"BLOCKED by Cloudflare on {short_name}! Status Code: {response.status_code}")
+                    break
+                    
+                data = response.json()
+                
+                if isinstance(data, dict):
+                    tee_time_list = data.get('data', data.get('teetimes', data.get('tee_times', [])))
+                elif isinstance(data, list):
+                    tee_time_list = data
+                else:
+                    tee_time_list = []
+                
+                if not tee_time_list:
+                    break
+                    
+                for item in tee_time_list:
+                    max_allowed = item.get('available_spots', 
+                                  item.get('max_player_size', 
+                                  item.get('spots_available', 4)))
+                    
+                    if DESIRED_PARTY_SIZE > max_allowed:
+                        continue
+                        
+                    raw_time = item.get('start_time')
+                    if raw_time:
+                        time_part = raw_time.zfill(5)
+                        if START_TIME <= time_part <= END_TIME:
+                            found_slots.append(f"{short_name} {time_part}")
+                            
+            except Exception as e:
+                print(f"Crash on {short_name}: {e}")
+                continue
+
 # --- NTFY PUSH NOTIFICATION LOGIC ---
 if found_slots:
     unique_slots = list(set(found_slots))
     unique_slots.sort()
     
-    # Body text is perfectly fine to have emojis
     msg_body = f"⛳ Openings found for {DESIRED_PARTY_SIZE} players:\n\n" + "\n".join(unique_slots)
     
     try:
@@ -103,9 +146,9 @@ if found_slots:
             f"https://ntfy.sh/{NTFY_TOPIC}",
             data=msg_body.encode('utf-8'),
             headers={
-                "Title": "SLC Tee Time Alert!", # <-- The crashing emoji has been removed from the header!
+                "Title": "SLC Tee Time Alert!", 
                 "Priority": "high",
-                "Tags": "golf" # <-- This tag automatically adds the emoji back onto your phone screen!
+                "Tags": "golf" 
             }
         )
         print(f"🚀 Success! Push notification sent to your phone.")
