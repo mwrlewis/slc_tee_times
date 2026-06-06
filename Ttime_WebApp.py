@@ -11,296 +11,114 @@ st.title("⛳ SLC Tee Time Finder")
 # ==========================================
 # 🤖 BOT COMMAND CENTER (SIDEBAR)
 # ==========================================
-st.sidebar.header("🤖 Bot Control Center")
-st.sidebar.write("Update your GitHub automated bot's hunting parameters.")
+st.sidebar.header("🤖 Bot Command Center")
 
+# 1. POWER SWITCH
+st.sidebar.subheader("Master Power Switch")
+current_status = st.sidebar.toggle("🤖 Bot Scheduler (Active/Paused)")
+
+if st.sidebar.button("Apply Power State"):
+    try:
+        cron_key = st.secrets["CRON_API_KEY"]
+        job_id = st.secrets["CRON_JOB_ID"]
+        headers = {"Authorization": f"Bearer {cron_key}", "Content-Type": "application/json"}
+        payload = {"job": {"enabled": current_status}}
+        response = requests.patch(f"https://api.cron-job.org/jobs/{job_id}", json=payload, headers=headers)
+        if response.status_code == 200:
+            st.sidebar.success(f"✅ Bot is now {'enabled' if current_status else 'disabled'}!")
+        else:
+            st.sidebar.error("Failed to update power state.")
+    except Exception as e:
+        st.sidebar.error(f"Error: {e}")
+
+# 2. PARAMETER UPDATER
+st.sidebar.subheader("Update Hunt Parameters")
 with st.sidebar.form("bot_update_form"):
     new_date = st.date_input("Hunt Date")
     new_start = st.time_input("Earliest Time", value=datetime.strptime("06:00", "%H:%M"))
     new_end = st.time_input("Latest Time", value=datetime.strptime("14:00", "%H:%M"))
     new_players = st.selectbox("Party Size", ["1", "2", "3", "4"], index=1)
-    
     submit_button = st.form_submit_button("Update GitHub Bot")
 
 if submit_button:
     try:
-        # Pull the secure secrets
         gh_token = st.secrets["GITHUB_TOKEN"]
         gh_repo = st.secrets["GITHUB_REPO"]
-        
-        headers = {
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {gh_token}",
-            "X-GitHub-Api-Version": "2022-11-28"
-        }
-        
-        # Dictionary mapping GitHub variable names to the new Streamlit inputs
+        headers = {"Accept": "application/vnd.github+json", "Authorization": f"Bearer {gh_token}", "X-GitHub-Api-Version": "2022-11-28"}
         updates = {
             "TARGET_DATE": new_date.strftime("%Y-%m-%d"),
             "START_TIME": new_start.strftime("%H:%M"),
             "END_TIME": new_end.strftime("%H:%M"),
             "PARTY_SIZE": new_players
         }
-        
         with st.spinner("Pushing new coordinates to GitHub..."):
-            success_count = 0
             for var_name, var_value in updates.items():
                 url = f"https://api.github.com/repos/{gh_repo}/actions/variables/{var_name}"
-                payload = {"name": var_name, "value": var_value}
-                
-                # The PATCH request updates the existing variable
-                response = requests.patch(url, json=payload, headers=headers)
-                
-                if response.status_code == 204:
-                    success_count += 1
-                else:
-                    st.sidebar.error(f"Failed to update {var_name}. Check your token permissions!")
-                    
-            if success_count == 4:
-                st.sidebar.success("✅ Bot successfully updated!")
-    except KeyError:
-        st.sidebar.error("⚠️ Streamlit Secrets are missing! Please add GITHUB_TOKEN and GITHUB_REPO to your app settings.")
+                requests.patch(url, json={"name": var_name, "value": var_value}, headers=headers)
+            st.sidebar.success("✅ Bot parameters updated!")
+    except Exception as e:
+        st.sidebar.error(f"Failed to update GitHub: {e}")
 
+# 3. CONNECTION CHECK
+if st.sidebar.button("Check API Status"):
+    try:
+        if requests.get("https://api.cron-job.org/jobs", headers={"Authorization": f"Bearer {st.secrets['CRON_API_KEY']}"}).status_code == 200:
+            st.sidebar.success("✅ Connected to Scheduler")
+        else:
+            st.sidebar.error("❌ Auth Failed")
+    except Exception as e:
+        st.sidebar.error(f"Connection error: {e}")
 
 # ==========================================
 # ⛳ LIVE MANUAL SEARCH ENGINE (MAIN PAGE)
 # ==========================================
-
-# --- THE UNIFIED COURSE CONFIGURATION ---
 COURSE_CONFIG = {
-    "Bonneville": {
-        "uuid": "bc27ab7a-6218-4b61-9aa8-0838f7c44ce3",
-        "link": "https://www.chronogolf.com/club/bonneville-golf-course",
-        "type": "city"
-    },
-    "Bonneville (Hole 10 Start)": {
-        "uuid": "caa8142a-4a42-482b-8d35-4239ce26f7b0",
-        "link": "https://www.chronogolf.com/club/bonneville-golf-course",
-        "type": "city"
-    },
-    "Forest Dale": {
-        "uuid": "41ea25ca-ffcb-4f14-a86d-de0ef84510e0",
-        "link": "https://www.chronogolf.com/club/forest-dale-golf-course",
-        "type": "city"
-    },
-    "Nibley Park": {
-        "uuid": "997cd01f-4ce8-4462-a459-594762efb606",
-        "link": "https://www.chronogolf.com/club/nibley-park-golf-course",
-        "type": "city"
-    },
-    "Mountain Dell (Layout 1)": {
-        "uuid": "2c162b65-6803-4bad-9a21-4c1ca88bb242",
-        "link": "https://www.chronogolf.com/club/mountain-dell-golf-club",
-        "type": "city"
-    },
-    "Mountain Dell (Layout 2)": {
-        "uuid": "77dca1a2-edae-47d2-a202-a1e9391cc305",
-        "link": "https://www.chronogolf.com/club/mountain-dell-golf-club",
-        "type": "city"
-    },
-    "Mountain Dell (Layout 3)": {
-        "uuid": "bd6e3c42-7ae5-4d97-b6d0-60ebf9957a7e",
-        "link": "https://www.chronogolf.com/club/mountain-dell-golf-club",
-        "type": "city"
-    },
-    "Glendale": {
-        "uuid": "547936f8-0f45-4bea-b557-d15a4de485ad",
-        "link": "https://www.chronogolf.com/club/glendale-golf-course",
-        "type": "city"
-    },
-    "Glendale (Hole 10 Start)": {
-        "uuid": "4984e272-06a5-446a-8e24-8402e3591b7c",
-        "link": "https://www.chronogolf.com/club/glendale-golf-course",
-        "type": "city"
-    },
-    "Rose Park": {
-        "uuid": "19a5558e-3821-4935-b6bd-0cbc99693d91",
-        "link": "https://www.chronogolf.com/club/rose-park-golf-course",
-        "type": "city"
-    },
-    "Rose Park (Hole 10 Start)": {
-        "uuid": "f899015b-2109-4028-8640-d670ada581e4",
-        "link": "https://www.chronogolf.com/club/rose-park-golf-course",
-        "type": "city"
-    },
-    "Meadowbrook": {
-        "uuid": "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db",
-        "link": "https://www.chronogolf.com/club/meadow-brook-slco",
-        "type": "city"
-    },
-    "Old Mill": {
-        "uuid": "99cc98d7-03aa-400c-a8b6-c5e5f3665ca4",
-        "link": "https://www.chronogolf.com/club/old-mill-slco",
-        "type": "county"
-    }
+    "Bonneville": {"uuid": "bc27ab7a-6218-4b61-9aa8-0838f7c44ce3", "link": "https://www.chronogolf.com/club/bonneville-golf-course", "type": "city"},
+    "Bonneville (Hole 10 Start)": {"uuid": "caa8142a-4a42-482b-8d35-4239ce26f7b0", "link": "https://www.chronogolf.com/club/bonneville-golf-course", "type": "city"},
+    "Forest Dale": {"uuid": "41ea25ca-ffcb-4f14-a86d-de0ef84510e0", "link": "https://www.chronogolf.com/club/forest-dale-golf-course", "type": "city"},
+    "Nibley Park": {"uuid": "997cd01f-4ce8-4462-a459-594762efb606", "link": "https://www.chronogolf.com/club/nibley-park-golf-course", "type": "city"},
+    "Mountain Dell (Layout 1)": {"uuid": "2c162b65-6803-4bad-9a21-4c1ca88bb242", "link": "https://www.chronogolf.com/club/mountain-dell-golf-club", "type": "city"},
+    "Mountain Dell (Layout 2)": {"uuid": "77dca1a2-edae-47d2-a202-a1e9391cc305", "link": "https://www.chronogolf.com/club/mountain-dell-golf-club", "type": "city"},
+    "Mountain Dell (Layout 3)": {"uuid": "bd6e3c42-7ae5-4d97-b6d0-60ebf9957a7e", "link": "https://www.chronogolf.com/club/mountain-dell-golf-club", "type": "city"},
+    "Glendale": {"uuid": "547936f8-0f45-4bea-b557-d15a4de485ad", "link": "https://www.chronogolf.com/club/glendale-golf-course", "type": "city"},
+    "Glendale (Hole 10 Start)": {"uuid": "4984e272-06a5-446a-8e24-8402e3591b7c", "link": "https://www.chronogolf.com/club/glendale-golf-course", "type": "city"},
+    "Rose Park": {"uuid": "19a5558e-3821-4935-b6bd-0cbc99693d91", "link": "https://www.chronogolf.com/club/rose-park-golf-course", "type": "city"},
+    "Rose Park (Hole 10 Start)": {"uuid": "f899015b-2109-4028-8640-d670ada581e4", "link": "https://www.chronogolf.com/club/rose-park-golf-course", "type": "city"},
+    "Meadowbrook": {"uuid": "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db", "link": "https://www.chronogolf.com/club/meadow-brook-slco", "type": "city"},
+    "Old Mill": {"uuid": "99cc98d7-03aa-400c-a8b6-c5e5f3665ca4", "link": "https://www.chronogolf.com/club/old-mill-slco", "type": "county"}
 }
 
-# --- INTERACTIVE UI CONTROLS ---
-st.subheader("Manual Search")
 target_date = st.date_input("Live Search Date")
-
 col1, col2, col3 = st.columns(3)
-with col1:
-    start_time_input = st.time_input("Live Earliest Time", value=datetime.strptime("06:00", "%H:%M"))
-with col2:
-    end_time_input = st.time_input("Live Latest Time", value=datetime.strptime("18:00", "%H:%M"))
-with col3:
-    players_input = st.selectbox("Live Players Wanted", ["1", "2", "3", "4"], index=3) 
+with col1: start = st.time_input("Earliest Time", value=datetime.strptime("06:00", "%H:%M"))
+with col2: end = st.time_input("Latest Time", value=datetime.strptime("18:00", "%H:%M"))
+with col3: players = st.selectbox("Players", ["1", "2", "3", "4"], index=3) 
 
-# --- THE "SELECT ALL" DROPDOWN LOGIC ---
-all_course_names = list(COURSE_CONFIG.keys())
-dropdown_options = ["Select All"] + all_course_names
+all_c = list(COURSE_CONFIG.keys())
+selected = st.multiselect("Select Courses", ["Select All"] + all_c, default=["Select All"])
+search_list = all_c if "Select All" in selected else selected
 
-selected_ui_options = st.multiselect(
-    "Select Courses to Search",
-    options=dropdown_options,
-    default=["Select All"]
-)
-
-# If "Select All" is in the box, search everything. Otherwise, just search what is picked.
-if "Select All" in selected_ui_options:
-    selected_courses = all_course_names
-else:
-    selected_courses = selected_ui_options
-
-TARGET_DATE = target_date.strftime("%Y-%m-%d")
-START_TIME = start_time_input.strftime("%H:%M")
-END_TIME = end_time_input.strftime("%H:%M")
-DESIRED_PARTY_SIZE = int(players_input)
-
-URL = "https://www.chronogolf.com/marketplace/v2/teetimes"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Origin": "https://www.chronogolf.com",
-    "Referer": "https://www.chronogolf.com/marketplace"
-}
-
-# --- THE SEARCH BUTTON LOGIC ---
 if st.button("🔍 Check For Openings", type="primary"):
-    
-    # Check if the user completely cleared the box
-    if not selected_courses:
-        st.warning("⚠️ Please select at least one golf course to run the search.")
-    else:
-        with st.spinner(f"Scrubbing selected databases for slots fitting exactly {players_input} players..."):
-            
-            scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'darwin', 'desktop': True})
-            course_openings = {}
-            openings_found = 0
-            
-            for course_name in selected_courses:
-                course_info = COURSE_CONFIG[course_name]
-                course_id = course_info["uuid"]
-                
-                # ---------------------------------------------------------
-                # COUNTY COURSE ROUTING (Old Mill)
-                # ---------------------------------------------------------
-                if course_info["type"] == "county":
-                    PRIVATE_URL = "https://www.chronogolf.com/marketplace/clubs/14210/teetimes"
-                    affiliations = ["57662"] * DESIRED_PARTY_SIZE 
-                    
-                    PARAMS = {
-                        "date": TARGET_DATE,
-                        "course_id": "16298",
-                        "nb_holes": "18",
-                        "affiliation_type_ids[]": affiliations
-                    }
-                    
-                    try:
-                        response = scraper.get(PRIVATE_URL, headers=HEADERS, params=PARAMS)
-                        if response.status_code != 200:
-                            continue 
-                        
-                        tee_time_list = response.json()
-                        if isinstance(tee_time_list, dict):
-                            tee_time_list = tee_time_list.get('data', [])
-                            
-                        for item in tee_time_list:
-                            if item.get('out_of_capacity') == True:
-                                continue
-                                
-                            raw_time = item.get('start_time') 
-                            
-                            if raw_time:
-                                time_part = raw_time.zfill(5)
-                                
-                                if START_TIME <= time_part <= END_TIME:
-                                    if course_name not in course_openings:
-                                        course_openings[course_name] = {"times": [], "uuid": course_id}
-                                    
-                                    if time_part not in course_openings[course_name]["times"]:
-                                        course_openings[course_name]["times"].append(time_part)
-                                        openings_found += 1
-                                        
-                    except Exception:
-                        continue 
+    scraper = cloudscraper.create_scraper()
+    found = {}
+    for name in search_list:
+        cfg = COURSE_CONFIG[name]
+        if cfg["type"] == "county":
+            res = scraper.get("https://www.chronogolf.com/marketplace/clubs/14210/teetimes", params={"date": target_date.strftime("%Y-%m-%d"), "course_id": "16298", "nb_holes": "18", "affiliation_type_ids[]": ["57662"] * int(players)})
+            if res.status_code == 200:
+                for item in res.json().get('data', []):
+                    if not item.get('out_of_capacity') and start.strftime("%H:%M") <= item['start_time'].zfill(5) <= end.strftime("%H:%M"):
+                        found.setdefault(name, []).append(item['start_time'].zfill(5))
+        else:
+            for p in range(1, 3):
+                res = scraper.get("https://www.chronogolf.com/marketplace/v2/teetimes", params={"start_date": target_date.strftime("%Y-%m-%d"), "course_ids": cfg["uuid"], "holes": "9,18", "nb_players": players, "page": str(p)})
+                if res.status_code == 200:
+                    for item in (res.json().get('data', []) if isinstance(res.json(), dict) else res.json()):
+                        if int(players) <= item.get('max_player_size', 4) and start.strftime("%H:%M") <= item['start_time'].zfill(5) <= end.strftime("%H:%M"):
+                            found.setdefault(name, []).append(item['start_time'].zfill(5))
 
-                # ---------------------------------------------------------
-                # CITY COURSE ROUTING (All Other Locations)
-                # ---------------------------------------------------------
-                else:
-                    for page_num in range(1, 3):
-                        PARAMS = {
-                            "start_date": TARGET_DATE, 
-                            "course_ids": course_id,
-                            "holes": "9,18", 
-                            "nb_players": players_input, 
-                            "page": str(page_num) 
-                        }
-                        
-                        try:
-                            response = scraper.get(URL, headers=HEADERS, params=PARAMS)
-                            if response.status_code != 200:
-                                break 
-                            
-                            data = response.json()
-                            tee_time_list = data.get('data', data.get('teetimes', data.get('tee_times', []))) if isinstance(data, dict) else (data if isinstance(data, list) else [])
-                                
-                            if not tee_time_list:
-                                break 
-                            
-                            for item in tee_time_list:
-                                max_allowed = item.get('max_player_size', 4)
-                                
-                                if DESIRED_PARTY_SIZE > max_allowed:
-                                    continue
-                                    
-                                raw_time = item.get('start_time') 
-                                    
-                                if raw_time:
-                                    time_part = raw_time.zfill(5)
-                                    
-                                    if START_TIME <= time_part <= END_TIME:
-                                        if course_name not in course_openings:
-                                            course_openings[course_name] = {"times": [], "uuid": course_id}
-                                        
-                                        if time_part not in course_openings[course_name]["times"]:
-                                            course_openings[course_name]["times"].append(time_part)
-                                            openings_found += 1
-                                            
-                        except Exception:
-                            continue 
-
-            # --- DISPLAY RESULTS ---
-            if openings_found > 0:
-                st.success(f"🎉 Found {openings_found} total tee times matching your filters!")
-                
-                for course_name, data in course_openings.items():
-                    times = data["times"]
-                    course_uuid = data["uuid"]
-                    
-                    times.sort() 
-                    st.subheader(f"⛳ {course_name}")
-                    formatted_times = ", ".join(times)
-                    st.info(f"**Available Slots:** {formatted_times}")
-                    
-                    base_url = COURSE_CONFIG[course_name]["link"]
-                    booking_url = f"{base_url}?date={TARGET_DATE}&nb_players={players_input}"
-                        
-                    st.link_button(f"🔗 Book {course_name}", booking_url)
-                    st.divider()
-                    
-            else:
-                st.warning(f"❌ No available times found matching your criteria.")
+    if found:
+        for n, t in found.items():
+            st.subheader(f"⛳ {n}"); st.info(f"Slots: {', '.join(sorted(list(set(t))))}")
+            st.link_button(f"Book {n}", f"{COURSE_CONFIG[n]['link']}?date={target_date}&nb_players={players}")
+    else: st.warning("No times found.")
