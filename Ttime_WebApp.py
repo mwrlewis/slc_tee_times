@@ -75,50 +75,42 @@ if st.button("🔍 Check For Openings", type="primary"):
         openings_found = 0
         
         for course_id in COURSE_UUIDS_LIST:
-            for page_num in range(1, 3):
+            
+            # ---------------------------------------------------------
+            # OLD MILL CODE SWITCH (PRIVATE CLUB API)
+            # ---------------------------------------------------------
+            if course_id == "99cc98d7-03aa-400c-a8b6-c5e5f3665ca4":
+                PRIVATE_URL = "https://www.chronogolf.com/marketplace/clubs/14210/teetimes"
+                
+                # Old Mill requires us to submit a "Player Code" for every person in the party.
+                # 57662 is Old Mill's default public rate code. 
+                # If you select 3 players, this makes a list: ["57662", "57662", "57662"]
+                affiliations = ["57662"] * DESIRED_PARTY_SIZE 
+                
                 PARAMS = {
-                    "start_date": TARGET_DATE, 
-                    "course_ids": course_id,
-                    "holes": "9,18", 
-                    "nb_players": players_input, 
-                    "page": str(page_num) 
+                    "date": TARGET_DATE,
+                    "course_id": "16298",
+                    "nb_holes": "18",
+                    "affiliation_type_ids[]": affiliations
                 }
                 
                 try:
-                    response = scraper.get(URL, headers=HEADERS, params=PARAMS)
+                    response = scraper.get(PRIVATE_URL, headers=HEADERS, params=PARAMS)
                     if response.status_code != 200:
-                        break 
+                        continue 
                     
-                    data = response.json()
-                    tee_time_list = data.get('data', data.get('teetimes', data.get('tee_times', []))) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                    tee_time_list = response.json()
+                    if isinstance(tee_time_list, dict):
+                        tee_time_list = tee_time_list.get('data', [])
                         
-                    if not tee_time_list:
-                        break 
-                    
                     for item in tee_time_list:
-                        
-                        max_allowed = item.get('max_player_size', 4)
-                        
-                        if DESIRED_PARTY_SIZE > max_allowed:
+                        # Old Mill API does the math for us. If it evaluates as "out_of_capacity = True", we skip it.
+                        if item.get('out_of_capacity') == True:
                             continue
                             
                         raw_time = item.get('start_time') 
-                        course_name = item.get('course', {}).get('name', 'Unknown Course')
+                        course_name = "Old Mill"
                         
-                        # Fix API naming quirks if they pop up
-                        if course_id == "caa8142a-4a42-482b-8d35-4239ce26f7b0":
-                            course_name = "Bonneville (Hole 10 Start)"
-                        elif course_id == "4984e272-06a5-446a-8e24-8402e3591b7c":
-                            course_name = "Glendale (Hole 10 Start)"
-                        elif course_id == "f899015b-2109-4028-8640-d670ada581e4":
-                            course_name = "Rose Park (Hole 10 Start)"
-                        elif course_id == "997cd01f-4ce8-4462-a459-594762efb606":
-                            course_name = "Nibley Park"
-                        elif course_id == "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db":
-                            course_name = "Meadowbrook"
-                        elif course_id == "99cc98d7-03aa-400c-a8b6-c5e5f3665ca4":
-                            course_name = "Old Mill"
-                            
                         if raw_time:
                             time_part = raw_time.zfill(5)
                             
@@ -132,6 +124,65 @@ if st.button("🔍 Check For Openings", type="primary"):
                                     
                 except Exception:
                     continue 
+
+            # ---------------------------------------------------------
+            # ALL OTHER CITY COURSES (GLOBAL MARKETPLACE API)
+            # ---------------------------------------------------------
+            else:
+                for page_num in range(1, 3):
+                    PARAMS = {
+                        "start_date": TARGET_DATE, 
+                        "course_ids": course_id,
+                        "holes": "9,18", 
+                        "nb_players": players_input, 
+                        "page": str(page_num) 
+                    }
+                    
+                    try:
+                        response = scraper.get(URL, headers=HEADERS, params=PARAMS)
+                        if response.status_code != 200:
+                            break 
+                        
+                        data = response.json()
+                        tee_time_list = data.get('data', data.get('teetimes', data.get('tee_times', []))) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                            
+                        if not tee_time_list:
+                            break 
+                        
+                        for item in tee_time_list:
+                            max_allowed = item.get('max_player_size', 4)
+                            
+                            if DESIRED_PARTY_SIZE > max_allowed:
+                                continue
+                                
+                            raw_time = item.get('start_time') 
+                            course_name = item.get('course', {}).get('name', 'Unknown Course')
+                            
+                            # Fix API naming quirks
+                            if course_id == "caa8142a-4a42-482b-8d35-4239ce26f7b0":
+                                course_name = "Bonneville (Hole 10 Start)"
+                            elif course_id == "4984e272-06a5-446a-8e24-8402e3591b7c":
+                                course_name = "Glendale (Hole 10 Start)"
+                            elif course_id == "f899015b-2109-4028-8640-d670ada581e4":
+                                course_name = "Rose Park (Hole 10 Start)"
+                            elif course_id == "997cd01f-4ce8-4462-a459-594762efb606":
+                                course_name = "Nibley Park"
+                            elif course_id == "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db":
+                                course_name = "Meadowbrook"
+                                
+                            if raw_time:
+                                time_part = raw_time.zfill(5)
+                                
+                                if START_TIME <= time_part <= END_TIME:
+                                    if course_name not in course_openings:
+                                        course_openings[course_name] = {"times": [], "uuid": course_id}
+                                    
+                                    if time_part not in course_openings[course_name]["times"]:
+                                        course_openings[course_name]["times"].append(time_part)
+                                        openings_found += 1
+                                        
+                    except Exception:
+                        continue 
 
         # --- DISPLAY RESULTS ---
         if openings_found > 0:
