@@ -3,14 +3,14 @@ import cloudscraper
 import requests
 from datetime import datetime
 
-# --- CREDENTIALS FROM GITHUB SECRETS ---
+# --- CREDENTIALS & PARAMETERS FROM GITHUB ---
+# These are pulled live from your GitHub Variables and Secrets!
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
 
-# --- BOT HUNTING PARAMETERS ---
-TARGET_DATE = "2026-06-07"     # Must be YYYY-MM-DD format
-START_TIME = "09:45"           # Earliest acceptable time
-END_TIME = "11:30"             # Latest acceptable time
-DESIRED_PARTY_SIZE = 2         # Will filter out slots with fewer available openings!
+TARGET_DATE = os.environ.get("TARGET_DATE", "2026-06-07")
+START_TIME = os.environ.get("START_TIME", "06:00")
+END_TIME = os.environ.get("END_TIME", "18:00")
+DESIRED_PARTY_SIZE = int(os.environ.get("PARTY_SIZE", 2))
 
 # --- THE COMPLETE COURSE DICTIONARY ---
 COURSES = {
@@ -146,7 +146,7 @@ if found_slots:
             f"https://ntfy.sh/{NTFY_TOPIC}",
             data=msg_body.encode('utf-8'),
             headers={
-                "Title": "SLC Tee Time Alert!", 
+                "Title": f"SLC Tee Time Alert! ({TARGET_DATE})", 
                 "Priority": "high",
                 "Tags": "golf" 
             }
