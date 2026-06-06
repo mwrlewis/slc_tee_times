@@ -59,18 +59,8 @@ if submit_button:
     except Exception as e:
         st.sidebar.error(f"Failed to update GitHub: {e}")
 
-# 3. CONNECTION CHECK
-if st.sidebar.button("Check API Status"):
-    try:
-        if requests.get("https://api.cron-job.org/jobs", headers={"Authorization": f"Bearer {st.secrets['CRON_API_KEY']}"}).status_code == 200:
-            st.sidebar.success("✅ Connected to Scheduler")
-        else:
-            st.sidebar.error("❌ Auth Failed")
-    except Exception as e:
-        st.sidebar.error(f"Connection error: {e}")
-
 # ==========================================
-# ⛳ LIVE MANUAL SEARCH ENGINE (MAIN PAGE)
+# ⛳ LIVE MANUAL SEARCH ENGINE
 # ==========================================
 COURSE_CONFIG = {
     "Bonneville": {"uuid": "bc27ab7a-6218-4b61-9aa8-0838f7c44ce3", "link": "https://www.chronogolf.com/club/bonneville-golf-course", "type": "city"},
@@ -101,21 +91,27 @@ search_list = all_c if "Select All" in selected else selected
 if st.button("🔍 Check For Openings", type="primary"):
     scraper = cloudscraper.create_scraper()
     found = {}
-    for name in search_list:
-        cfg = COURSE_CONFIG[name]
-        if cfg["type"] == "county":
-            res = scraper.get("https://www.chronogolf.com/marketplace/clubs/14210/teetimes", params={"date": target_date.strftime("%Y-%m-%d"), "course_id": "16298", "nb_holes": "18", "affiliation_type_ids[]": ["57662"] * int(players)})
-            if res.status_code == 200:
-                for item in res.json().get('data', []):
-                    if not item.get('out_of_capacity') and start.strftime("%H:%M") <= item['start_time'].zfill(5) <= end.strftime("%H:%M"):
-                        found.setdefault(name, []).append(item['start_time'].zfill(5))
-        else:
-            for p in range(1, 3):
-                res = scraper.get("https://www.chronogolf.com/marketplace/v2/teetimes", params={"start_date": target_date.strftime("%Y-%m-%d"), "course_ids": cfg["uuid"], "holes": "9,18", "nb_players": players, "page": str(p)})
-                if res.status_code == 200:
-                    for item in (res.json().get('data', []) if isinstance(res.json(), dict) else res.json()):
-                        if int(players) <= item.get('max_player_size', 4) and start.strftime("%H:%M") <= item['start_time'].zfill(5) <= end.strftime("%H:%M"):
-                            found.setdefault(name, []).append(item['start_time'].zfill(5))
+    with st.spinner("Scrubbing data..."):
+        for name in search_list:
+            cfg = COURSE_CONFIG[name]
+            try:
+                if cfg["type"] == "county":
+                    res = scraper.get("https://www.chronogolf.com/marketplace/clubs/14210/teetimes", params={"date": target_date.strftime("%Y-%m-%d"), "course_id": "16298", "nb_holes": "18", "affiliation_type_ids[]": ["57662"] * int(players)})
+                    if res.status_code == 200 and isinstance(res.json(), dict):
+                        for item in res.json().get('data', []):
+                            if not item.get('out_of_capacity') and start.strftime("%H:%M") <= item['start_time'].zfill(5) <= end.strftime("%H:%M"):
+                                found.setdefault(name, []).append(item['start_time'].zfill(5))
+                else:
+                    for p in range(1, 3):
+                        res = scraper.get("https://www.chronogolf.com/marketplace/v2/teetimes", params={"start_date": target_date.strftime("%Y-%m-%d"), "course_ids": cfg["uuid"], "holes": "9,18", "nb_players": players, "page": str(p)})
+                        if res.status_code == 200:
+                            data = res.json()
+                            items = data.get('data', data.get('teetimes', [])) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                            for item in items:
+                                if int(players) <= item.get('max_player_size', 4) and start.strftime("%H:%M") <= item['start_time'].zfill(5) <= end.strftime("%H:%M"):
+                                    found.setdefault(name, []).append(item['start_time'].zfill(5))
+            except Exception:
+                continue
 
     if found:
         for n, t in found.items():
