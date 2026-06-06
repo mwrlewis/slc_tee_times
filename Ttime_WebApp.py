@@ -59,6 +59,20 @@ if submit_button:
     except Exception as e:
         st.sidebar.error(f"Failed to update GitHub: {e}")
 
+# 3. CONNECTION CHECK
+st.sidebar.subheader("System Utilities")
+if st.sidebar.button("Check API Status"):
+    try:
+        cron_key = st.secrets["CRON_API_KEY"]
+        headers = {"Authorization": f"Bearer {cron_key}"}
+        response = requests.get("https://api.cron-job.org/jobs", headers=headers)
+        if response.status_code == 200:
+            st.sidebar.success("✅ Connected to Scheduler")
+        else:
+            st.sidebar.error("❌ Auth Failed")
+    except Exception as e:
+        st.sidebar.error(f"Error: {e}")
+
 # ==========================================
 # ⛳ LIVE MANUAL SEARCH ENGINE
 # ==========================================
