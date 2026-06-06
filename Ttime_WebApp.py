@@ -36,7 +36,8 @@ COURSE_UUIDS_LIST = [
     "4984e272-06a5-446a-8e24-8402e3591b7c",  # Glendale (Hole 10)
     "19a5558e-3821-4935-b6bd-0cbc99693d91",  # Rose Park (Main)
     "f899015b-2109-4028-8640-d670ada581e4",  # Rose Park (Hole 10)
-    "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db"   # Meadowbrook
+    "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db",  # Meadowbrook
+    "99cc98d7-03aa-400c-a8b6-c5e5f3665ca4"   # Old Mill
 ]
 
 # --- DIRECT COURSE LINKS ---
@@ -52,7 +53,8 @@ COURSE_LINKS = {
     "4984e272-06a5-446a-8e24-8402e3591b7c": "https://www.chronogolf.com/club/glendale-golf-course", 
     "19a5558e-3821-4935-b6bd-0cbc99693d91": "https://www.chronogolf.com/club/rose-park-golf-course",
     "f899015b-2109-4028-8640-d670ada581e4": "https://www.chronogolf.com/club/rose-park-golf-course",
-    "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db": "https://www.chronogolf.com/club/meadow-brook-slco", # Meadowbrook Link!
+    "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db": "https://www.chronogolf.com/club/meadow-brook-slco",
+    "99cc98d7-03aa-400c-a8b6-c5e5f3665ca4": "https://www.chronogolf.com/club/old-mill-slco"
 }
 
 URL = "https://www.chronogolf.com/marketplace/v2/teetimes"
@@ -114,6 +116,8 @@ if st.button("🔍 Check For Openings", type="primary"):
                             course_name = "Nibley Park"
                         elif course_id == "c3155ad4-2f72-4b4d-80ec-a3b3c08a89db":
                             course_name = "Meadowbrook"
+                        elif course_id == "99cc98d7-03aa-400c-a8b6-c5e5f3665ca4":
+                            course_name = "Old Mill"
                             
                         if raw_time:
                             time_part = raw_time.zfill(5)
