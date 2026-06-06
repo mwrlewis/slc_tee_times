@@ -8,9 +8,9 @@ NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
 
 # --- BOT HUNTING PARAMETERS ---
 TARGET_DATE = "2026-06-07"     # Must be YYYY-MM-DD format
-START_TIME = "09:30"           # Earliest acceptable time
+START_TIME = "09:45"           # Earliest acceptable time
 END_TIME = "11:30"             # Latest acceptable time
-DESIRED_PARTY_SIZE = 1         # Will filter out slots with fewer available openings!
+DESIRED_PARTY_SIZE = 2         # Will filter out slots with fewer available openings!
 
 # --- THE COMPLETE COURSE DICTIONARY ---
 COURSES = {
