@@ -7,10 +7,10 @@ from datetime import datetime
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
 
 # --- BOT HUNTING PARAMETERS ---
-TARGET_DATE = "2026-06-06"     # Must be YYYY-MM-DD format
-START_TIME = "06:00"           # Earliest acceptable time
-END_TIME = "14:30"             # Latest acceptable time
-DESIRED_PARTY_SIZE = 4         # Will filter out slots with fewer available openings!
+TARGET_DATE = "2026-06-07"     # Must be YYYY-MM-DD format
+START_TIME = "09:30"           # Earliest acceptable time
+END_TIME = "11:30"             # Latest acceptable time
+DESIRED_PARTY_SIZE = 1         # Will filter out slots with fewer available openings!
 
 # --- THE COMPLETE COURSE DICTIONARY ---
 COURSES = {
