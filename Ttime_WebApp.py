@@ -69,9 +69,9 @@ if st.sidebar.button("Check API Status"):
         if response.status_code == 200:
             st.sidebar.success("✅ Connected to Scheduler")
         else:
-            st.sidebar.error("❌ Auth Failed")
+            st.sidebar.error("❌ Auth Failed (Check Secrets)")
     except Exception as e:
-        st.sidebar.error(f"Error: {e}")
+        st.sidebar.error(f"Connection error: {e}")
 
 # ==========================================
 # ⛳ LIVE MANUAL SEARCH ENGINE
@@ -96,39 +96,4 @@ target_date = st.date_input("Live Search Date")
 col1, col2, col3 = st.columns(3)
 with col1: start = st.time_input("Earliest Time", value=datetime.strptime("06:00", "%H:%M"))
 with col2: end = st.time_input("Latest Time", value=datetime.strptime("18:00", "%H:%M"))
-with col3: players = st.selectbox("Players", ["1", "2", "3", "4"], index=3) 
-
-all_c = list(COURSE_CONFIG.keys())
-selected = st.multiselect("Select Courses", ["Select All"] + all_c, default=["Select All"])
-search_list = all_c if "Select All" in selected else selected
-
-if st.button("🔍 Check For Openings", type="primary"):
-    scraper = cloudscraper.create_scraper()
-    found = {}
-    with st.spinner("Scrubbing data..."):
-        for name in search_list:
-            cfg = COURSE_CONFIG[name]
-            try:
-                if cfg["type"] == "county":
-                    res = scraper.get("https://www.chronogolf.com/marketplace/clubs/14210/teetimes", params={"date": target_date.strftime("%Y-%m-%d"), "course_id": "16298", "nb_holes": "18", "affiliation_type_ids[]": ["57662"] * int(players)})
-                    if res.status_code == 200 and isinstance(res.json(), dict):
-                        for item in res.json().get('data', []):
-                            if not item.get('out_of_capacity') and start.strftime("%H:%M") <= item['start_time'].zfill(5) <= end.strftime("%H:%M"):
-                                found.setdefault(name, []).append(item['start_time'].zfill(5))
-                else:
-                    for p in range(1, 3):
-                        res = scraper.get("https://www.chronogolf.com/marketplace/v2/teetimes", params={"start_date": target_date.strftime("%Y-%m-%d"), "course_ids": cfg["uuid"], "holes": "9,18", "nb_players": players, "page": str(p)})
-                        if res.status_code == 200:
-                            data = res.json()
-                            items = data.get('data', data.get('teetimes', [])) if isinstance(data, dict) else (data if isinstance(data, list) else [])
-                            for item in items:
-                                if int(players) <= item.get('max_player_size', 4) and start.strftime("%H:%M") <= item['start_time'].zfill(5) <= end.strftime("%H:%M"):
-                                    found.setdefault(name, []).append(item['start_time'].zfill(5))
-            except Exception:
-                continue
-
-    if found:
-        for n, t in found.items():
-            st.subheader(f"⛳ {n}"); st.info(f"Slots: {', '.join(sorted(list(set(t))))}")
-            st.link_button(f"Book {n}", f"{COURSE_CONFIG[n]['link']}?date={target_date}&nb_players={players}")
-    else: st.warning("No times found.")
+with col3: players = st.selectbox
