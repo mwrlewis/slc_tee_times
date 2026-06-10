@@ -69,12 +69,12 @@ if st.sidebar.button("Check API Status"):
         if response.status_code == 200:
             st.sidebar.success("✅ Connected to Scheduler")
         else:
-            st.sidebar.error("❌ Auth Failed (Check Secrets)")
+            st.sidebar.error("❌ Auth Failed")
     except Exception as e:
-        st.sidebar.error(f"Connection error: {e}")
+        st.sidebar.error(f"Error: {e}")
 
 # ==========================================
-# ⛳ LIVE MANUAL SEARCH ENGINE
+# ⛳ LIVE MANUAL SEARCH ENGINE (MAIN PAGE)
 # ==========================================
 COURSE_CONFIG = {
     "Bonneville": {"uuid": "bc27ab7a-6218-4b61-9aa8-0838f7c44ce3", "link": "https://www.chronogolf.com/club/bonneville-golf-course", "type": "city"},
@@ -92,8 +92,79 @@ COURSE_CONFIG = {
     "Old Mill": {"uuid": "99cc98d7-03aa-400c-a8b6-c5e5f3665ca4", "link": "https://www.chronogolf.com/club/old-mill-slco", "type": "county"}
 }
 
-target_date = st.date_input("Live Search Date")
-col1, col2, col3 = st.columns(3)
-with col1: start = st.time_input("Earliest Time", value=datetime.strptime("06:00", "%H:%M"))
-with col2: end = st.time_input("Latest Time", value=datetime.strptime("18:00", "%H:%M"))
-with col3: players = st.selectbox
+st.subheader("Manual Search Criteria")
+
+# Date and Players Configuration Rows
+col_date, col_players = st.columns(2)
+with col_date:
+    target_date = st.date_input("Live Search Date")
+with col_players:
+    players = st.selectbox("Players", ["1", "2", "3", "4"], index=3) 
+
+# Time Filters Configuration Rows
+col_start, col_end = st.columns(2)
+with col_start:
+    start = st.time_input("Earliest Time Window", value=datetime.strptime("06:00", "%H:%M"))
+with col_end:
+    end = st.time_input("Latest Time Window", value=datetime.strptime("18:00", "%H:%M"))
+
+# Dynamic Course Selection Framework
+all_courses = list(COURSE_CONFIG.keys())
+selected_courses = st.multiselect("Select Target Courses", ["Select All"] + all_courses, default=["Select All"])
+
+# Select All Logic Evaluation
+if "Select All" in selected_courses:
+    search_list = all_courses
+else:
+    search_list = selected_courses
+
+# Execution Trigger
+if st.button("🔍 Check For Openings", type="primary"):
+    scraper = cloudscraper.create_scraper()
+    found = {}
+    with st.spinner("Scrubbing data across live APIs..."):
+        for name in search_list:
+            cfg = COURSE_CONFIG[name]
+            try:
+                # ---------------------------------------------------------
+                # OLD MILL COUNTY FALLBACK ROUTING
+                # ---------------------------------------------------------
+                if cfg["type"] == "county":
+                    res = scraper.get(
+                        "https://www.chronogolf.com/marketplace/clubs/14210/teetimes", 
+                        params={"date": target_date.strftime("%Y-%m-%d")}
+                    )
+                    if res.status_code == 200:
+                        data = res.json()
+                        items = data if isinstance(data, list) else data.get('data', [])
+                        for item in items:
+                            raw_time = item.get('start_time', '')
+                            if raw_time and start.strftime("%H:%M") <= raw_time.zfill(5) <= end.strftime("%H:%M"):
+                                found.setdefault(name, []).append(raw_time.zfill(5))
+                # ---------------------------------------------------------
+                # CITY COURSES ROUTING
+                # ---------------------------------------------------------
+                else:
+                    for p in range(1, 3):
+                        res = scraper.get("https://www.chronogolf.com/marketplace/v2/teetimes", params={"start_date": target_date.strftime("%Y-%m-%d"), "course_ids": cfg["uuid"], "holes": "9,18", "nb_players": players, "page": str(p)})
+                        if res.status_code == 200:
+                            data = res.json()
+                            items = data.get('data', data.get('teetimes', [])) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                            for item in items:
+                                if int(players) <= item.get('max_player_size', 4) and start.strftime("%H:%M") <= item['start_time'].zfill(5) <= end.strftime("%H:%M"):
+                                    found.setdefault(name, []).append(item['start_time'].zfill(5))
+            except Exception:
+                continue
+
+    # Results Render Logic
+    if found:
+        for n, t in found.items():
+            st.subheader(f"⛳ {n}")
+            st.info(f"Slots: {', '.join(sorted(list(set(t))))}")
+            st.link_button(f"Book {n}", f"{COURSE_CONFIG[n]['link']}?date={target_date}&nb_players={players}")
+    else: 
+        st.warning("No times found.")
+        # UI Fallback link helper specifically for Old Mill when filtered
+        if "Old Mill" in search_list:
+            st.info("Old Mill may have times available but is blocking the scraper. Check manually below.")
+            st.link_button("Book Old Mill Manually", f"{COURSE_CONFIG['Old Mill']['link']}?date={target_date}&nb_players={players}")
