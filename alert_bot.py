@@ -4,9 +4,7 @@ import requests
 from datetime import datetime
 
 # --- CREDENTIALS & PARAMETERS FROM GITHUB ---
-# These are pulled live from your GitHub Variables and Secrets!
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
-
 TARGET_DATE = os.environ.get("TARGET_DATE", "2026-06-07")
 START_TIME = os.environ.get("START_TIME", "06:00")
 END_TIME = os.environ.get("END_TIME", "18:00")
@@ -48,45 +46,28 @@ print(f"Starting sweep for {TARGET_DATE} between {START_TIME} and {END_TIME} for
 for course_id, short_name in COURSES.items():
     
     # ---------------------------------------------------------
-    # OLD MILL CODE SWITCH (PRIVATE CLUB API)
+    # OLD MILL COUNTY FALLBACK ROUTING
     # ---------------------------------------------------------
     if course_id == "99cc98d7-03aa-400c-a8b6-c5e5f3665ca4":
-        PRIVATE_URL = "https://www.chronogolf.com/marketplace/clubs/14210/teetimes"
-        affiliations = ["57662"] * DESIRED_PARTY_SIZE
-        
-        PARAMS = {
-            "date": TARGET_DATE,
-            "course_id": "16298",
-            "nb_holes": "18",
-            "affiliation_type_ids[]": affiliations
-        }
-        
         try:
-            response = scraper.get(PRIVATE_URL, headers=HEADERS, params=PARAMS)
-            if response.status_code != 200:
-                print(f"BLOCKED by Cloudflare on {short_name}! Status Code: {response.status_code}")
-                continue
-                
-            tee_time_list = response.json()
-            if isinstance(tee_time_list, dict):
-                tee_time_list = tee_time_list.get('data', tee_time_list.get('teetimes', []))
-                
-            for item in tee_time_list:
-                if item.get('out_of_capacity') == True:
-                    continue
-                    
-                raw_time = item.get('start_time')
-                if raw_time:
-                    time_part = raw_time.zfill(5)
-                    if START_TIME <= time_part <= END_TIME:
-                        found_slots.append(f"{short_name} {time_part}")
-                        
+            res = scraper.get(
+                "https://www.chronogolf.com/marketplace/clubs/14210/teetimes", 
+                headers=HEADERS, 
+                params={"date": TARGET_DATE}
+            )
+            if res.status_code == 200:
+                data = res.json()
+                items = data if isinstance(data, list) else data.get('data', [])
+                for item in items:
+                    raw_time = item.get('start_time', '')
+                    if raw_time and START_TIME <= raw_time.zfill(5) <= END_TIME:
+                        found_slots.append(f"{short_name} {raw_time.zfill(5)}")
         except Exception as e:
             print(f"Crash on {short_name}: {e}")
             continue
 
     # ---------------------------------------------------------
-    # ALL OTHER CITY COURSES (GLOBAL MARKETPLACE API)
+    # CITY COURSES ROUTING
     # ---------------------------------------------------------
     else:
         for page_num in range(1, 3):
@@ -96,39 +77,23 @@ for course_id, short_name in COURSES.items():
                 "holes": "9,18",
                 "page": str(page_num)
             }
-            
             try:
                 response = scraper.get(URL, headers=HEADERS, params=PARAMS)
-                
                 if response.status_code != 200:
-                    print(f"BLOCKED by Cloudflare on {short_name}! Status Code: {response.status_code}")
                     break
                     
                 data = response.json()
+                items = data.get('data', data.get('teetimes', [])) if isinstance(data, dict) else (data if isinstance(data, list) else [])
                 
-                if isinstance(data, dict):
-                    tee_time_list = data.get('data', data.get('teetimes', data.get('tee_times', [])))
-                elif isinstance(data, list):
-                    tee_time_list = data
-                else:
-                    tee_time_list = []
-                
-                if not tee_time_list:
+                if not items:
                     break
                     
-                for item in tee_time_list:
-                    max_allowed = item.get('available_spots', 
-                                  item.get('max_player_size', 
-                                  item.get('spots_available', 4)))
-                    
-                    if DESIRED_PARTY_SIZE > max_allowed:
-                        continue
-                        
-                    raw_time = item.get('start_time')
-                    if raw_time:
-                        time_part = raw_time.zfill(5)
-                        if START_TIME <= time_part <= END_TIME:
-                            found_slots.append(f"{short_name} {time_part}")
+                for item in items:
+                    max_allowed = item.get('available_spots', item.get('max_player_size', item.get('spots_available', 4)))
+                    if DESIRED_PARTY_SIZE <= max_allowed:
+                        raw_time = item.get('start_time', '')
+                        if raw_time and START_TIME <= raw_time.zfill(5) <= END_TIME:
+                            found_slots.append(f"{short_name} {raw_time.zfill(5)}")
                             
             except Exception as e:
                 print(f"Crash on {short_name}: {e}")
@@ -151,7 +116,7 @@ if found_slots:
                 "Tags": "golf" 
             }
         )
-        print(f"🚀 Success! Push notification sent to your phone.")
+        print("🚀 Success! Push notification sent to your phone.")
         print(msg_body) 
     except Exception as e:
         print(f"❌ Failed to transmit message: {e}")
